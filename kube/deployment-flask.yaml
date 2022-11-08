@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: funflask-app
+  labels:
+    app: funflask-helloworld
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: funflask-helloworld
+  template:
+    metadata:
+      labels:
+        app: funflask-helloworld
+    spec:
+      containers:
+      - name: flask
+        image: funflask:v3
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "1.0"
+--- 
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: funflask-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: funflask-app
+  minReplicas: 5
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-svc
+  labels:
+    app: funflask-helloworld
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 32767
+    protocol: TCP
+  selector:
+    app: funflask-helloworld
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flask-ingress
+  labels:
+    app: funflask-helloworld
+  annotations:
+    # Disables http redirect to https
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: flask-svc
+            port:
+              number: 80
